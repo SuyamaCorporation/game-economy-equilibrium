@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Economy Equilibrium Explorer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+<div class="max-w-6xl mx-auto p-4">
+  <header class="text-center py-6">
+    <h1 class="text-3xl font-bold text-yellow-400">⚔️ Game Economy Equilibrium Explorer</h1>
+    <p class="text-slate-400 mt-1">Define items & recipes, simulate bot traders, find inflation spirals & bottlenecks</p>
+  </header>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Setup Panel -->
+    <div class="space-y-4">
+      <!-- Items -->
+      <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+        <h2 class="font-semibold text-yellow-400 mb-3">Items</h2>
+        <div class="space-y-2">
+          <input id="itemName" type="text" placeholder="Item name (e.g. Iron Ore)" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-slate-400">Base Price (gold)</label>
+              <input id="itemPrice" type="number" min="1" value="10" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">Supply (units/tick)</label>
+              <input id="itemSupply" type="number" min="0" value="100" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+            </div>
+          </div>
+          <select id="itemRarity" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+            <option value="common">Common</option>
+            <option value="uncommon">Uncommon</option>
+            <option value="rare">Rare</option>
+            <option value="epic">Epic</option>
+          </select>
+          <button onclick="addItem()" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 rounded-lg text-sm transition">+ Add Item</button>
+        </div>
+
+        <div id="itemList" class="mt-3 space-y-1 max-h-40 overflow-y-auto"></div>
+      </div>
+
+      <!-- Recipes -->
+      <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+        <h2 class="font-semibold text-yellow-400 mb-3">Recipes</h2>
+        <div class="space-y-2">
+          <input id="recipeName" type="text" placeholder="Output item name" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+          <input id="recipeInputs" type="text" placeholder="Inputs: Iron Ore×3,Coal×2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-slate-400">Output qty</label>
+              <input id="recipeOutput" type="number" min="1" value="1" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">Craft time (ticks)</label>
+              <input id="recipeTicks" type="number" min="1" value="3" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white">
+            </div>
+          </div>
+          <button onclick="addRecipe()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition">+ Add Recipe</button>
+        </div>
+        <div id="recipeList" class="mt-3 space-y-1 max-h-40 overflow-y-auto"></div>
+      </div>
+
+      <!-- Simulation Controls -->
+      <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+        <h2 class="font-semibold text-yellow-400 mb-3">Simulation</h2>
+        <div class="space-y-2">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-slate-400">Bot Players</label>
+              <input id="numBots" type="number" min="1" max="100" value="10" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">Ticks to run</label>
+              <input id="numTicks" type="number" min="1" max="200" value="50" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            </div>
+          </div>
+          <button onclick="runSimulation()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-sm transition">▶ Run Simulation</button>
+          <button onclick="resetSim()" class="w-full bg-slate-600 hover:bg-slate-500 text-white font-semibold py-2 rounded-lg text-sm transition">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="lg:col-span-2 space-y-4">
+      <!-- Price Charts -->
+      <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+        <h2 class="font-semibold text-yellow-400 mb-3">Price History</h2>
+        <div id="priceChart"></div>
+      </div>
+
+      <!-- Alerts -->
+      <div id="alertsPanel" class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+        <h2 class="font-semibold text-yellow-400 mb-3">Economy Alerts</h2>
+        <div id="alertsList" class="text-slate-400 text-sm italic">Run a simulation to see alerts</div>
+      </div>
+
+      <!-- Market State -->
+      <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+        <h2 class="font-semibold text-yellow-400 mb-3">Market State</h2>
+        <div id="marketState"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let items = JSON.parse(localStorage.getItem('game_items') || '[]');
+let recipes = JSON.parse(localStorage.getItem('game_recipes') || '[]');
+let simResults = null;
+
+function save() {
+  localStorage.setItem('game_items', JSON.stringify(items));
+  localStorage.setItem('game_recipes', JSON.stringify(recipes));
+}
+
+function addItem() {
+  const name = document.getElementById('itemName').value.trim();
+  if (!name) return alert('Name required');
+  if (items.find(i => i.name.toLowerCase() === name.toLowerCase())) return alert('Item already exists');
+  items.push({
+    id: Date.now().toString(), name,
+    basePrice: parseFloat(document.getElementById('itemPrice').value) || 10,
+    supply: parseInt(document.getElementById('itemSupply').value) || 100,
+    rarity: document.getElementById('itemRarity').value
+  });
+  save(); renderItems();
+  document.getElementById('itemName').value = '';
+}
+
+function addRecipe() {
+  const output = document.getElementById('recipeName').value.trim();
+  if (!output) return alert('Output item required');
+  const inputStr = document.getElementById('recipeInputs').value.trim();
+  const inputs = inputStr.split(',').map(s => {
+    const [item, qty] = s.trim().split('×');
+    return { item: item?.trim(), qty: parseInt(qty) || 1 };
+  }).filter(i => i.item);
+  if (inputs.length === 0) return alert('Add at least one input');
+  recipes.push({
+    id: Date.now().toString(), output,
+    outputQty: parseInt(document.getElementById('recipeOutput').value) || 1,
+    inputs,
+    ticks: parseInt(document.getElementById('recipeTicks').value) || 3
+  });
+  save(); renderRecipes();
+  document.getElementById('recipeName').value = '';
+  document.getElementById('recipeInputs').value = '';
+}
+
+function renderItems() {
+  const RARITY = {common:'text-gray-400',uncommon:'text-green-400',rare:'text-blue-400',epic:'text-purple-400'};
+  document.getElementById('itemList').innerHTML = items.map(i => `
+    <div class="flex items-center justify-between bg-slate-700 rounded-lg px-2 py-1 text-xs">
+      <span class="${RARITY[i.rarity]}">${i.name}</span>
+      <span class="text-yellow-400">${i.basePrice}g</span>
+      <span class="text-slate-400">${i.supply}/tick</span>
+      <button onclick="items=items.filter(x=>x.id!=='${i.id}');save();renderItems()" class="text-slate-500 hover:text-red-400">✕</button>
+    </div>`).join('');
+}
+
+function renderRecipes() {
+  document.getElementById('recipeList').innerHTML = recipes.map(r => `
+    <div class="flex items-center justify-between bg-slate-700 rounded-lg px-2 py-1 text-xs">
+      <span class="text-blue-300">${r.inputs.map(i=>`${i.item}×${i.qty}`).join('+')} → ${r.output}×${r.outputQty}</span>
+      <span class="text-slate-400">${r.ticks}t</span>
+      <button onclick="recipes=recipes.filter(x=>x.id!=='${r.id}');save();renderRecipes()" class="text-slate-500 hover:text-red-400">✕</button>
+    </div>`).join('');
+}
+
+function runSimulation() {
+  if (items.length === 0) return alert('Add items first');
+  const numBots = parseInt(document.getElementById('numBots').value) || 10;
+  const numTicks = parseInt(document.getElementById('numTicks').value) || 50;
+
+  // Initialize market state
+  const market = {};
+  items.forEach(item => {
+    market[item.name] = {
+      price: item.basePrice,
+      supply: item.supply * 10,
+      demand: 0,
+      volume: 0,
+      history: [item.basePrice]
+    };
+  });
+
+  // Initialize bots
+  const bots = Array.from({length: numBots}, (_, i) => ({
+    id: i,
+    gold: 500 + Math.random() * 500,
+    inventory: {},
+    strategy: ['trader','crafter','hoarder'][i % 3]
+  }));
+
+  // Simulation loop
+  for (let tick = 0; tick < numTicks; tick++) {
+    // Add new supply
+    items.forEach(item => {
+      market[item.name].supply += item.supply;
+    });
+
+    // Bots act
+    bots.forEach(bot => {
+      if (bot.strategy === 'trader') {
+        // Buy cheap items
+        const affordable = items.filter(i => market[i.name].price < i.basePrice * 1.2 && market[i.name].supply > 5 && bot.gold >= market[i.name].price);
+        if (affordable.length > 0) {
+          const item = affordable[Math.floor(Math.random() * affordable.length)];
+          const qty = Math.floor(Math.min(3, bot.gold / market[item.name].price));
+          if (qty > 0) {
+            bot.gold -= market[item.name].price * qty;
+            bot.inventory[item.name] = (bot.inventory[item.name] || 0) + qty;
+            market[item.name].supply -= qty;
+            market[item.name].demand += qty;
+            market[item.name].volume += qty;
+          }
+        }
+        // Sell expensive items
+        Object.entries(bot.inventory).forEach(([name, qty]) => {
+          if (qty > 0 && market[name] && market[name].price > (items.find(i=>i.name===name)?.basePrice || 10) * 1.3) {
+            bot.gold += market[name].price * qty;
+            market[name].supply += qty;
+            bot.inventory[name] = 0;
+          }
+        });
+      } else if (bot.strategy === 'crafter') {
+        // Try to craft things
+        recipes.forEach(recipe => {
+          const canCraft = recipe.inputs.every(inp => (bot.inventory[inp.item] || 0) >= inp.qty);
+          if (canCraft) {
+            recipe.inputs.forEach(inp => { bot.inventory[inp.item] -= inp.qty; });
+            bot.inventory[recipe.output] = (bot.inventory[recipe.output] || 0) + recipe.outputQty;
+          } else {
+            // Buy inputs
+            recipe.inputs.forEach(inp => {
+              if ((bot.inventory[inp.item] || 0) < inp.qty && market[inp.item] && market[inp.item].supply > 0 && bot.gold >= market[inp.item].price) {
+                const need = inp.qty - (bot.inventory[inp.item] || 0);
+                bot.gold -= market[inp.item].price * need;
+                bot.inventory[inp.item] = (bot.inventory[inp.item] || 0) + need;
+                market[inp.item].supply -= need;
+                market[inp.item].demand += need;
+              }
+            });
+          }
+        });
+      } else if (bot.strategy === 'hoarder') {
+        // Buy and hold
+        const item = items[tick % items.length];
+        if (item && market[item.name].supply > 0 && bot.gold >= market[item.name].price) {
+          const qty = Math.floor(Math.min(5, bot.gold / market[item.name].price / 2));
+          if (qty > 0) {
+            bot.gold -= market[item.name].price * qty;
+            bot.inventory[item.name] = (bot.inventory[item.name] || 0) + qty;
+            market[item.name].supply -= qty;
+            market[item.name].demand += qty;
+          }
+        }
+      }
+    });
+
+    // Update prices based on supply/demand
+    items.forEach(item => {
+      const m = market[item.name];
+      const ratio = m.supply > 0 ? m.demand / (m.supply + 1) : 2;
+      const inflation = 1 + (ratio - 0.5) * 0.1;
+      m.price = Math.max(1, m.price * inflation * (0.97 + Math.random() * 0.06));
+      m.history.push(Math.round(m.price * 10) / 10);
+      m.demand = 0;
+    });
+  }
+
+  simResults = { market, bots, items: [...items] };
+  renderResults();
+}
+
+function renderResults() {
+  if (!simResults) return;
+  const { market } = simResults;
+
+  // Price chart
+  const container = document.getElementById('priceChart');
+  const W = 480, H = 150;
+  const allItems = Object.keys(market);
+  const colors = ['#f59e0b','#3b82f6','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4'];
+
+  let paths = '';
+  allItems.forEach((name, ci) => {
+    const hist = market[name].history;
+    const maxP = Math.max(...hist), minP = Math.min(...hist);
+    const range = maxP - minP || 1;
+    const n = hist.length;
+    const pts = hist.map((p,i) => `${(i/(n-1))*(W-20)+10},${H-10-((p-minP)/range)*(H-25)}`).join(' ');
+    paths += `<polyline points="${pts}" fill="none" stroke="${colors[ci%colors.length]}" stroke-width="1.5" opacity="0.9"/>`;
+    const lastX = W - 10, lastY = H - 10 - ((hist[hist.length-1] - minP) / range) * (H - 25);
+    paths += `<text x="${lastX + 2}" y="${lastY + 3}" font-size="7" fill="${colors[ci%colors.length]}">${name.substring(0,8)}</text>`;
+  });
+
+  container.innerHTML = `<svg viewBox="0 0 ${W+80} ${H}" class="w-full" height="${H}">
+    <line x1="8" y1="0" x2="8" y2="${H}" stroke="#475569" stroke-width="0.5"/>
+    <line x1="8" y1="${H-8}" x2="${W}" y2="${H-8}" stroke="#475569" stroke-width="0.5"/>
+    ${paths}
+  </svg>`;
+
+  // Alerts
+  const alerts = [];
+  Object.entries(market).forEach(([name, m]) => {
+    const first = m.history[0], last = m.history[m.history.length - 1];
+    const change = ((last - first) / first) * 100;
+    if (change > 50) alerts.push({ type: 'inflation', msg: `⚠️ ${name}: +${Math.round(change)}% price inflation spiral detected`, color: 'text-red-400' });
+    if (change < -30) alerts.push({ type: 'crash', msg: `📉 ${name}: ${Math.round(change)}% price crash — oversupply or low demand`, color: 'text-yellow-400' });
+    if (m.supply < 5) alerts.push({ type: 'bottleneck', msg: `🚧 ${name}: Supply bottleneck (${Math.round(m.supply)} units remaining)`, color: 'text-orange-400' });
+  });
+
+  // Recipe profitability
+  recipes.forEach(r => {
+    const inputCost = r.inputs.reduce((s, inp) => s + (market[inp.item]?.price || 0) * inp.qty, 0);
+    const outputVal = (market[r.output]?.price || 0) * r.outputQty;
+    if (outputVal > inputCost * 2) {
+      alerts.push({ type: 'meta', msg: `🔥 Meta-shift: Crafting ${r.output} is ${Math.round((outputVal/inputCost-1)*100)}% profit — expect bot pile-on`, color: 'text-purple-400' });
+    }
+  });
+
+  document.getElementById('alertsList').innerHTML = alerts.length > 0
+    ? alerts.map(a => `<p class="${a.color} text-sm mb-1">${a.msg}</p>`).join('')
+    : '<p class="text-green-400 text-sm">✓ Economy looks balanced — no major alerts</p>';
+
+  // Market state table
+  document.getElementById('marketState').innerHTML = `<div class="overflow-x-auto"><table class="w-full text-xs">
+    <thead><tr class="text-slate-400 border-b border-slate-700">
+      <th class="text-left pb-2">Item</th>
+      <th class="text-right pb-2">Start</th>
+      <th class="text-right pb-2">End Price</th>
+      <th class="text-right pb-2">Change</th>
+      <th class="text-right pb-2">Supply</th>
+      <th class="text-right pb-2">Volume</th>
+    </tr></thead>
+    <tbody>
+      ${Object.entries(market).map(([name, m]) => {
+        const change = ((m.history[m.history.length-1] - m.history[0]) / m.history[0]) * 100;
+        return `<tr class="border-b border-slate-700 hover:bg-slate-700">
+          <td class="py-1.5 text-yellow-300">${name}</td>
+          <td class="text-right">${m.history[0]}g</td>
+          <td class="text-right font-bold">${Math.round(m.price*10)/10}g</td>
+          <td class="text-right ${change > 0 ? 'text-red-400' : 'text-green-400'}">${change >= 0 ? '+' : ''}${Math.round(change)}%</td>
+          <td class="text-right">${Math.round(m.supply)}</td>
+          <td class="text-right">${m.volume}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+function resetSim() {
+  simResults = null;
+  document.getElementById('priceChart').innerHTML = '';
+  document.getElementById('alertsList').innerHTML = '<p class="text-slate-400 text-sm italic">Run a simulation to see alerts</p>';
+  document.getElementById('marketState').innerHTML = '';
+}
+
+renderItems();
+renderRecipes();
+
+// Preload example items if empty
+if (items.length === 0) {
+  items = [
+    {id:'1',name:'Iron Ore',basePrice:5,supply:200,rarity:'common'},
+    {id:'2',name:'Coal',basePrice:3,supply:150,rarity:'common'},
+    {id:'3',name:'Iron Bar',basePrice:25,supply:20,rarity:'uncommon'},
+    {id:'4',name:'Gold',basePrice:100,supply:5,rarity:'rare'},
+  ];
+  recipes = [
+    {id:'1',output:'Iron Bar',outputQty:1,inputs:[{item:'Iron Ore',qty:3},{item:'Coal',qty:2}],ticks:3}
+  ];
+  save();
+  renderItems();
+  renderRecipes();
+}
+</script>
+</body>
+</html>
